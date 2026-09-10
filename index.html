@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Notebook</title>
+<meta name="description" content="A modern, organized notepad with folders, favorites, autosave, and Google sign-in." />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="theme-color" content="#2F6FED" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<button class="menu-toggle" id="sidebarToggle" aria-label="Toggle notes">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+</button>
+<div class="backdrop" id="sidebarBackdrop"></div>
+
+<div class="app" id="app">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="4" y="3" width="16" height="18" rx="2.5" fill="white" fill-opacity="0.18"/>
+          <path d="M8 8h8M8 12h8M8 16h5" stroke="white" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div class="brand-text">
+        <span class="brand-name">Notebook</span>
+        <span class="brand-tag">Write. Organize. Achieve.</span>
+      </div>
+    </div>
+
+    <button class="new-note-btn" id="newNoteBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      New Note
+    </button>
+
+    <div class="search-wrap">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="search-icon"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <input type="text" id="searchInput" placeholder="Search notes" autocomplete="off" />
+    </div>
+
+    <nav class="nav-section" id="navSection">
+      <button class="nav-item active" data-view="all">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span>All Notes</span>
+        <span class="nav-count" id="countAll">0</span>
+      </button>
+      <button class="nav-item" data-view="favorites">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span>Favorites</span>
+        <span class="nav-count" id="countFav">0</span>
+      </button>
+      <button class="nav-item" data-view="recent">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Recent</span>
+        <span class="nav-count" id="countRecent">0</span>
+      </button>
+    </nav>
+
+    <div class="folders-section">
+      <div class="folders-label">Folders</div>
+      <ul class="folder-list" id="folderList"></ul>
+    </div>
+
+    <ul class="note-list" id="noteList" role="listbox" aria-label="Notes"></ul>
+
+    <div class="sidebar-footer">
+      <div id="signedOutBox">
+        <button id="signInBtn" class="google-btn">
+          <svg width="16" height="16" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.87 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.55-1.84.86-3.06.86-2.35 0-4.34-1.58-5.05-3.71H.98v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.71a5.4 5.4 0 0 1 0-3.42V4.96H.98a9 9 0 0 0 0 8.08l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .98 4.96l2.97 2.33C4.66 5.16 6.65 3.58 9 3.58z"/></svg>
+          Sign in with Google
+        </button>
+        <p class="sync-hint">Sign in to keep a separate set of notes per account on this device.</p>
+      </div>
+      <div id="signedInBox" class="hidden">
+        <img id="userAvatar" class="avatar" alt="" />
+        <div class="user-meta">
+          <span id="userName" class="user-name"></span>
+          <button id="signOutBtn" class="link-btn">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="editor-area">
+
+    <div class="editor-topbar">
+      <div class="save-indicator">
+        <span id="saveStatus" class="save-status">All changes saved</span>
+      </div>
+      <div class="editor-topbar-actions">
+        <button id="favoriteBtn" class="icon-btn" title="Add to favorites" aria-label="Add to favorites">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </button>
+        <select id="folderSelect" class="folder-select" title="Folder" aria-label="Folder"></select>
+        <button id="deleteNoteBtn" class="icon-btn danger" title="Delete note" aria-label="Delete note">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M5 7h14M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m2 0-1 13a2 2 0 01-2 2H8a2 2 0 01-2-2L5 7h14z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="toolbar" id="toolbar" role="toolbar" aria-label="Formatting">
+      <div class="toolbar-group">
+        <select id="blockFormat" class="tb-select" title="Paragraph style" aria-label="Paragraph style">
+          <option value="p">Paragraph</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+          <option value="blockquote">Quote</option>
+          <option value="pre">Code</option>
+        </select>
+        <select id="fontSize" class="tb-select" title="Size" aria-label="Font size">
+          <option value="2">Small</option>
+          <option value="3" selected>Normal</option>
+          <option value="4">Medium</option>
+          <option value="5">Large</option>
+          <option value="6">Huge</option>
+        </select>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <div class="toolbar-group">
+        <button class="tb-btn" data-cmd="bold" title="Bold (Ctrl+B)" aria-label="Bold"><b>B</b></button>
+        <button class="tb-btn" data-cmd="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i>I</i></button>
+        <button class="tb-btn" data-cmd="underline" title="Underline (Ctrl+U)" aria-label="Underline"><u>U</u></button>
+        <button class="tb-btn" data-cmd="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><s>S</s></button>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <div class="toolbar-group">
+        <label class="tb-btn color-swatch" title="Text color" aria-label="Text color">
+          A<input type="color" id="textColor" value="#101828" />
+        </label>
+        <label class="tb-btn color-swatch" title="Highlight" aria-label="Highlight color">
+          <span class="hl-icon">H</span><input type="color" id="highlightColor" value="#FDE68A" />
+        </label>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <div class="toolbar-group">
+        <button class="tb-btn" data-cmd="justifyLeft" title="Align left" aria-label="Align left">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h10M4 18h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="tb-btn" data-cmd="justifyCenter" title="Align center" aria-label="Align center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M7 12h10M5 18h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="tb-btn" data-cmd="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="6" r="1.4" fill="currentColor"/><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="5" cy="18" r="1.4" fill="currentColor"/><path d="M10 6h10M10 12h10M10 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="tb-btn" data-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><text x="2" y="8" font-size="6" fill="currentColor">1</text><text x="2" y="14" font-size="6" fill="currentColor">2</text><text x="2" y="20" font-size="6" fill="currentColor">3</text><path d="M10 6h10M10 12h10M10 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <div class="toolbar-group">
+        <button class="tb-btn" data-cmd="insertTable" title="Insert table" aria-label="Insert table">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="14" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M4 10.3h16M4 15h16M11 5v14" stroke="currentColor" stroke-width="1.6"/></svg>
+        </button>
+        <button class="tb-btn" data-cmd="createLink" title="Insert link" aria-label="Insert link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 15l6-6M8 13l-2 2a3.5 3.5 0 105 5l2-2M16 11l2-2a3.5 3.5 0 10-5-5l-2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="tb-btn" data-cmd="removeFormat" title="Clear formatting" aria-label="Clear formatting">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 4h13M12 4l-2 16M4 20h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="page-scroll">
+      <div class="page-wrap">
+        <input type="text" id="noteTitle" class="note-title" placeholder="Untitled note" autocomplete="off" />
+        <div class="note-date" id="noteDate"></div>
+        <div id="editor" class="editor" contenteditable="true" spellcheck="true" aria-label="Note content"></div>
+      </div>
+    </div>
+
+    <div class="statusbar">
+      <span id="wordCount">0 words</span>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Firebase project configuration for Inkleaf Notes.
+  // This client-side config identifies the Firebase project; never put a
+  // Firebase service-account private key in this file.
+  window.FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCKgznBW-8v0NxXpOavocyMrWL3ipfldhQ",
+    authDomain: "notepad-eb5f5.firebaseapp.com",
+    projectId: "notepad-eb5f5",
+    storageBucket: "notepad-eb5f5.firebasestorage.app",
+    messagingSenderId: "23333060543",
+    appId: "1:23333060543:web:6b668e8ee063aefd9aba0",
+    measurementId: "G-2R15QFJR"
+  };
+</script>
+<script src="https://www.gstatic.com/firebasejs/11.7.3/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.7.3/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore-compat.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
