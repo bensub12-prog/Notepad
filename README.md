@@ -13,7 +13,27 @@ other devices after they connect.
 Firestore also keeps a local cache, so the editor remains usable while offline
 and queued changes can synchronize when the connection returns.
 
-## 1. Firebase setup
+## Troubleshooting a "sync error"
+
+This version adds an account chip in the top-right of the editor (shows who's
+signed in, with a colored status dot) and a red banner that appears whenever
+a cloud sync fails, with the real Firebase error code and a **Retry** button.
+Open it and check the code shown — it maps to one of these almost every time:
+
+| Error code | What it means | Fix |
+|---|---|---|
+| `auth/unauthorized-domain` | Your GitHub Pages domain isn't allowed to sign in. | Firebase Console → Authentication → Settings → Authorized domains → add your `*.github.io` domain (see step 1 below). |
+| `permission-denied` | Firestore is rejecting reads/writes for this user. | The rules in `firestore.rules` were never **published**. Open Firebase Console → Firestore Database → Rules, paste the file's contents, click **Publish**. |
+| `auth/operation-not-supported-in-this-environment` | Sign-in was attempted inside an iframe/embedded preview. | Open the deployed app in its own tab, not an embedded preview window. |
+| `auth/network-request-failed` | The browser couldn't reach Google/Firebase. | Check your connection; also try disabling ad blockers/privacy extensions, which sometimes block Firebase/Google auth requests. |
+| `failed-precondition` (from `enablePersistence`) | Offline cache couldn't start. | This is a warning, not fatal — it happens when the app is open in more than one tab. Safe to ignore, or close other tabs. |
+| `firebase-init-failed` / "Firebase SDK/config missing" | The Firebase scripts never loaded at all. | Usually a network/ad-blocker issue, or the CDN `<script>` tags in `index.html` were edited/removed. Check the browser console for the actual failed request. |
+
+If you see a different code, the banner text and browser console
+(`Cloud sync error: ...`) will have the exact code and message — that's the
+fastest way to pin it down further.
+
+
 
 This project is already configured for the Firebase project used by Inkleaf
 Notes. The web client configuration is in `index.html`. Client-side Firebase

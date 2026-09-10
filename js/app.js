@@ -45,6 +45,19 @@
   const authModalSignInBtn = document.getElementById("authModalSignInBtn");
   const authContinueBtn = document.getElementById("authContinueBtn");
   const authCloseBtn = document.getElementById("authCloseBtn");
+  const accountChip = document.getElementById("accountChip");
+  const accountChipBtn = document.getElementById("accountChipBtn");
+  const chipAvatar = document.getElementById("chipAvatar");
+  const chipLabel = document.getElementById("chipLabel");
+  const accountMenu = document.getElementById("accountMenu");
+  const accountMenuName = document.getElementById("accountMenuName");
+  const accountMenuSub = document.getElementById("accountMenuSub");
+  const accountMenuSignIn = document.getElementById("accountMenuSignIn");
+  const accountMenuSignOut = document.getElementById("accountMenuSignOut");
+  const syncBanner = document.getElementById("syncBanner");
+  const syncBannerText = document.getElementById("syncBannerText");
+  const syncBannerRetry = document.getElementById("syncBannerRetry");
+  const syncBannerDismiss = document.getElementById("syncBannerDismiss");
   let authPromptDismissed = sessionStorage.getItem("inkleaf.authPromptDismissed") === "1";
   let authStateResolved = false;
 
@@ -85,21 +98,82 @@
     }
   }
 
-  function setCloudStatus(state) {
+  // ---------- Friendly error messages ----------
+  function friendlyAuthError(code) {
+    const map = {
+      "auth/unauthorized-domain": "This site's domain isn't authorized for Google sign-in yet. In the Firebase console, go to Authentication → Settings → Authorized domains and add this domain.",
+      "auth/operation-not-supported-in-this-environment": "Google sign-in doesn't work inside an embedded preview or iframe. Open this app in its own browser tab and try again.",
+      "auth/network-request-failed": "Couldn't reach Google/Firebase. Check your internet connection, or an ad blocker/privacy extension may be blocking the request.",
+      "auth/popup-blocked": "Your browser blocked the sign-in popup. Allow popups for this site and try again.",
+      "auth/web-storage-unsupported": "Your browser is blocking the storage sign-in needs — this happens in some private/incognito modes or with strict cookie-blocking settings.",
+      "auth/cancelled-popup-request": null,
+      "auth/popup-closed-by-user": null,
+    };
+    return map[code] ?? null;
+  }
+
+  function friendlySyncError(code) {
+    const map = {
+      "permission-denied": "Firestore is rejecting these reads/writes. Make sure the rules in firestore.rules have been pasted into Firebase Console → Firestore Database → Rules and published.",
+      "unavailable": "Can't reach Firestore right now — check your connection.",
+      "failed-precondition": "Offline storage couldn't start, often because this app is open in more than one tab. Close other tabs and reload.",
+      "unauthenticated": "Your sign-in session expired. Try signing in again.",
+      "resource-exhausted": "Firestore's free-tier quota may have been hit for today.",
+    };
+    return map[code] ?? null;
+  }
+
+  // ---------- Sync status: topbar text + account chip dot + error banner ----------
+  let lastSyncError = null;
+
+  function setChipStatus(status) {
+    accountChip.classList.remove("status-synced", "status-syncing", "status-error", "status-local");
+    accountChip.classList.add(`status-${status}`);
+  }
+
+  function showSyncBanner(err) {
+    const code = err?.code || "unknown-error";
+    const friendly = friendlySyncError(code);
+    syncBannerText.textContent = friendly || `Couldn't sync to the cloud (${code}). Your notes are still saved on this device.`;
+    syncBanner.classList.remove("hidden");
+  }
+  function hideSyncBanner() { syncBanner.classList.add("hidden"); }
+
+  function setCloudStatus(state, err) {
     if (state === "syncing") {
       saveStatus.textContent = "Syncing…";
       saveStatus.classList.remove("saved", "offline");
       saveStatus.classList.add("saving");
+      setChipStatus("syncing");
+      hideSyncBanner();
     } else if (state === "offline") {
       setSaveStatus("offline");
+      setChipStatus(firebaseUser ? "syncing" : "local");
     } else if (state === "error") {
       saveStatus.textContent = "Saved locally • sync error";
       saveStatus.classList.remove("saving", "saved");
       saveStatus.classList.add("offline");
+      setChipStatus("error");
+      lastSyncError = err || null;
+      if (err) console.error("Cloud sync error:", err.code || err);
+      showSyncBanner(err);
     } else {
       setSaveStatus(navigator.onLine ? "saved" : "offline");
+      setChipStatus(firebaseUser ? "synced" : "local");
+      hideSyncBanner();
     }
   }
+
+  syncBannerDismiss.addEventListener("click", hideSyncBanner);
+  syncBannerRetry.addEventListener("click", () => {
+    hideSyncBanner();
+    if (firebaseUser) {
+      cloudSyncStarted = false;
+      startCloudSync(notes.slice());
+    } else {
+      setCloudStatus("saved");
+    }
+  });
 
   function noteRef(noteId) {
     if (!firebaseUser || !firestore) return null;
@@ -122,7 +196,7 @@
       setCloudStatus("saved");
     } catch (e) {
       console.error("Cloud note save failed", e);
-      setCloudStatus("error");
+      setCloudStatus("error", e);
     }
   }
 
@@ -134,7 +208,7 @@
       setCloudStatus("saved");
     } catch (e) {
       console.error("Cloud note delete failed", e);
-      setCloudStatus("error");
+      setCloudStatus("error", e);
     }
   }
 
@@ -204,7 +278,7 @@
           }
         }, (error) => {
           console.error("Cloud sync listener failed", error);
-          setCloudStatus("error");
+          setCloudStatus("error", error);
         });
     } catch (e) {
       console.error("Cloud sync initialization failed", e);
@@ -213,7 +287,7 @@
       persistNotes();
       activeId = notes[0]?.id ?? null;
       renderAll();
-      setCloudStatus("error");
+      setCloudStatus("error", e);
     }
   }
 
@@ -239,6 +313,7 @@
       try {
         await firebaseAuth.getRedirectResult();
       } catch (e) {
+        console.error("getRedirectResult failed:", e?.code || e);
         if (e && e.code) showAuthError(e);
       }
 
@@ -293,7 +368,10 @@
       firebaseReady = false;
       authStateResolved = true;
       applySignedOutUI();
+      chipLabel.textContent = "Sync unavailable";
+      accountMenuSub.textContent = "The Firebase SDK failed to load — sync is off. Notes are still saved on this device.";
       signInBtn.title = "Firebase could not be initialized. Check the Firebase configuration.";
+      showSyncBanner({ code: e?.code || "firebase-init-failed", message: e?.message || String(e) });
     }
   }
 
@@ -668,18 +746,69 @@
   sidebarBackdrop.addEventListener("click", closeSidebarMobile);
 
   // ---------- Firebase Google Sign-In ----------
+  const AUTH_MODAL_TITLE_EL = document.getElementById("authModalTitle");
+  const AUTH_MODAL_TEXT_EL = document.getElementById("authModalText");
+  const AUTH_MODAL_DEFAULT_TITLE = AUTH_MODAL_TITLE_EL?.textContent || "";
+  const AUTH_MODAL_DEFAULT_TEXT = AUTH_MODAL_TEXT_EL?.innerHTML || "";
+
+  function resetAuthModalCopy() {
+    if (AUTH_MODAL_TITLE_EL) AUTH_MODAL_TITLE_EL.textContent = AUTH_MODAL_DEFAULT_TITLE;
+    if (AUTH_MODAL_TEXT_EL) AUTH_MODAL_TEXT_EL.innerHTML = AUTH_MODAL_DEFAULT_TEXT;
+  }
+
   function applySignedInUI(profile) {
     signedOutBox.classList.add("hidden");
     signedInBox.classList.remove("hidden");
     userAvatar.src = profile.picture || "";
     userAvatar.alt = profile.name || profile.email || "Account";
     userName.textContent = profile.name || profile.email || "Signed in";
+
+    accountChip.classList.add("signed-in");
+    if (profile.picture) {
+      chipAvatar.src = profile.picture;
+      chipAvatar.classList.remove("hidden");
+    } else {
+      chipAvatar.classList.add("hidden");
+    }
+    chipLabel.textContent = profile.name || profile.email || "Signed in";
+    accountMenuName.textContent = profile.name || "Signed in";
+    accountMenuSub.textContent = profile.email ? `Synced as ${profile.email}` : "Synced across your devices";
+    accountMenuSignIn.classList.add("hidden");
+    accountMenuSignOut.classList.remove("hidden");
+    setChipStatus("synced");
+    resetAuthModalCopy();
   }
 
   function applySignedOutUI() {
     signedInBox.classList.add("hidden");
     signedOutBox.classList.remove("hidden");
+
+    accountChip.classList.remove("signed-in");
+    chipAvatar.classList.add("hidden");
+    chipLabel.textContent = "Not signed in";
+    accountMenuName.textContent = "Not signed in";
+    accountMenuSub.textContent = "Notes are saved on this device only.";
+    accountMenuSignIn.classList.remove("hidden");
+    accountMenuSignOut.classList.add("hidden");
+    setChipStatus("local");
   }
+
+  function closeAccountMenu() {
+    accountMenu.classList.add("hidden");
+    accountChipBtn.setAttribute("aria-expanded", "false");
+  }
+  function toggleAccountMenu() {
+    const isHidden = accountMenu.classList.contains("hidden");
+    if (isHidden) {
+      accountMenu.classList.remove("hidden");
+      accountChipBtn.setAttribute("aria-expanded", "true");
+    } else {
+      closeAccountMenu();
+    }
+  }
+  accountChipBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleAccountMenu(); });
+  document.addEventListener("click", (e) => { if (!accountChip.contains(e.target)) closeAccountMenu(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAccountMenu(); });
 
   function showAuthPrompt() {
     if (!authModal || authPromptDismissed || firebaseUser || !authStateResolved) return;
@@ -692,6 +821,7 @@
     if (!authModal) return;
     authModal.hidden = true;
     document.body.classList.remove("auth-open");
+    resetAuthModalCopy();
     if (remember) {
       authPromptDismissed = true;
       sessionStorage.setItem("inkleaf.authPromptDismissed", "1");
@@ -702,13 +832,22 @@
     const code = error?.code || "unknown-error";
     const message = error?.message || "An unknown authentication error occurred.";
     console.error("Google sign-in failed:", { code, message, error });
+    setChipStatus("error");
+
+    const hint = friendlyAuthError(code);
+    if (hint === null && (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request")) {
+      return; // User-initiated cancellation — not a real error, nothing to show.
+    }
 
     // Keep the error inside the app instead of using a browser alert.
     if (authModal) {
-      const title = document.getElementById("authModalTitle");
-      const text = document.getElementById("authModalText");
-      if (title) title.textContent = "We couldn't sign you in.";
-      if (text) text.innerHTML = `Please try again. <strong>Error:</strong> ${code}.<br><small>${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</small>`;
+      if (AUTH_MODAL_TITLE_EL) AUTH_MODAL_TITLE_EL.textContent = "We couldn't sign you in.";
+      if (AUTH_MODAL_TEXT_EL) {
+        const escaped = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        AUTH_MODAL_TEXT_EL.innerHTML = hint
+          ? `${hint}<br><small>Error code: <code>${code}</code></small>`
+          : `Please try again. <strong>Error:</strong> ${code}.<br><small>${escaped}</small>`;
+      }
       authModal.hidden = false;
       document.body.classList.add("auth-open");
       setTimeout(() => authModalSignInBtn?.focus(), 60);
@@ -719,7 +858,7 @@
 
   async function signInWithGoogle() {
     if (!firebaseReady || !firebaseAuth) {
-      showAuthError({ code: "firebase-not-ready", message: "Firebase is still loading. Please try again in a moment." });
+      showAuthError({ code: "firebase-not-ready", message: "Firebase is still loading, or its SDK failed to load (check ad blockers / network). Please try again in a moment." });
       return;
     }
 
@@ -741,22 +880,25 @@
     }
   }
 
-  signInBtn.addEventListener("click", signInWithGoogle);
-  authModalSignInBtn?.addEventListener("click", signInWithGoogle);
-  authContinueBtn?.addEventListener("click", () => hideAuthPrompt(true));
-  authCloseBtn?.addEventListener("click", () => hideAuthPrompt(true));
-
-  authModal?.querySelector(".auth-modal-backdrop")?.addEventListener("click", () => hideAuthPrompt(true));
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && authModal && !authModal.hidden) hideAuthPrompt(true);
-  });
-
-  signOutBtn.addEventListener("click", async () => {
+  async function doSignOut() {
     try {
       if (firebaseAuth) await firebaseAuth.signOut();
     } catch (e) {
       console.error("Sign out failed", e);
     }
+  }
+
+  signInBtn.addEventListener("click", signInWithGoogle);
+  authModalSignInBtn?.addEventListener("click", signInWithGoogle);
+  authContinueBtn?.addEventListener("click", () => hideAuthPrompt(true));
+  authCloseBtn?.addEventListener("click", () => hideAuthPrompt(true));
+  accountMenuSignIn.addEventListener("click", () => { closeAccountMenu(); signInWithGoogle(); });
+  accountMenuSignOut.addEventListener("click", () => { closeAccountMenu(); doSignOut(); });
+  signOutBtn.addEventListener("click", doSignOut);
+
+  authModal?.querySelector(".auth-modal-backdrop")?.addEventListener("click", () => hideAuthPrompt(true));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && authModal && !authModal.hidden) hideAuthPrompt(true);
   });
 
   // ---------- Service worker ----------

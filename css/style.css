@@ -311,17 +311,137 @@ button, input, select { font-family: inherit; color: inherit; }
 .editor-topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 10px 20px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
+  gap: 10px;
 }
-.save-status { font-size: 0.78rem; color: var(--ink-faint); }
+.save-status { font-size: 0.78rem; color: var(--ink-faint); white-space: nowrap; }
 .save-status.saving { color: #F5A524; }
 .save-status.saved { color: #12B76A; }
 .save-status.offline { color: var(--danger); }
 
 .editor-topbar-actions { display: flex; align-items: center; gap: 6px; }
+
+/* ---------- Account chip ---------- */
+
+.account-chip { position: relative; margin-left: auto; }
+
+.account-chip-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 9px 0 5px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  max-width: 200px;
+}
+.account-chip-btn:hover { border-color: var(--blue); background: var(--blue-soft); color: var(--blue-dark); }
+.account-chip.signed-in .account-chip-btn { color: var(--ink); }
+
+.chip-avatar-wrap { position: relative; width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.chip-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+.chip-guest-icon { color: var(--ink-faint); }
+.account-chip.signed-in .chip-guest-icon { display: none; }
+.account-chip:not(.signed-in) .chip-avatar { display: none; }
+
+.chip-dot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  border: 1.5px solid var(--panel);
+}
+.account-chip.status-synced .chip-dot { background: #12B76A; }
+.account-chip.status-syncing .chip-dot { background: #F5A524; }
+.account-chip.status-error .chip-dot { background: var(--danger); }
+.account-chip.status-local .chip-dot { background: var(--ink-faint); }
+
+.chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 128px; }
+.chip-caret { color: var(--ink-faint); flex-shrink: 0; }
+
+.account-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 252px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.14);
+  padding: 6px;
+  z-index: 30;
+}
+.account-menu-info { padding: 10px 10px 11px; border-bottom: 1px solid var(--border-soft); margin-bottom: 6px; }
+.account-menu-name { display: block; font-size: 0.86rem; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-menu-sub { display: block; font-size: 0.74rem; color: var(--ink-faint); margin-top: 2px; }
+
+.account-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.account-menu-item:hover { background: var(--bg); }
+.account-menu-item.danger { color: var(--danger); }
+.account-menu-item.danger:hover { background: var(--danger-soft); }
+
+/* ---------- Sync error banner ---------- */
+
+.sync-banner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 20px;
+  background: var(--danger-soft);
+  color: #B4271F;
+  border-bottom: 1px solid #F7C6C1;
+  font-size: 0.82rem;
+}
+.sync-banner-icon { flex-shrink: 0; }
+.sync-banner-text { flex: 1; min-width: 0; }
+.sync-banner-retry {
+  border: 1px solid #F0928A;
+  background: white;
+  color: #B4271F;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 7px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sync-banner-retry:hover { background: #FEEEEC; }
+.sync-banner-dismiss {
+  border: none;
+  background: transparent;
+  color: #B4271F;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
 
 .icon-btn {
   width: 32px;
@@ -460,6 +580,11 @@ button, input, select { font-family: inherit; color: inherit; }
   .note-title { font-size: 1.5rem; }
   .editor-topbar { padding-left: 56px; }
   .toolbar { padding-left: 56px; }
+  .save-status { display: none; }
+  .account-chip { margin-left: 0; }
+  .chip-label { max-width: 88px; }
+  .account-menu { position: fixed; left: 12px; right: 12px; top: 58px; width: auto; }
+  .sync-banner { padding-left: 56px; }
 }
 
 /* ---------- Account sign-in prompt ---------- */
