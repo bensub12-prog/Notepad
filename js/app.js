@@ -41,6 +41,11 @@
   const signOutBtn = document.getElementById("signOutBtn");
   const userAvatar = document.getElementById("userAvatar");
   const userName = document.getElementById("userName");
+  const authModal = document.getElementById("authModal");
+  const authModalSignInBtn = document.getElementById("authModalSignInBtn");
+  const authContinueBtn = document.getElementById("authContinueBtn");
+  const authCloseBtn = document.getElementById("authCloseBtn");
+  let authPromptDismissed = sessionStorage.getItem("inkleaf.authPromptDismissed") === "1";
 
   // ---------- Firebase + local storage ----------
   const GUEST_KEY = "guest";
@@ -258,6 +263,8 @@
           applySignedOutUI();
           renderAll();
           if (!notes.length) createNote();
+          // Give first-time visitors a clear, professional choice to enable sync.
+          if (!authPromptDismissed) setTimeout(showAuthPrompt, 350);
         }
       });
     } catch (e) {
@@ -651,24 +658,55 @@
     signedOutBox.classList.remove("hidden");
   }
 
-  signInBtn.addEventListener("click", async () => {
+  function showAuthPrompt() {
+    if (!authModal || authPromptDismissed || firebaseUser) return;
+    authModal.hidden = false;
+    document.body.classList.add("auth-open");
+    setTimeout(() => authModalSignInBtn?.focus(), 60);
+  }
+
+  function hideAuthPrompt(remember = true) {
+    if (!authModal) return;
+    authModal.hidden = true;
+    document.body.classList.remove("auth-open");
+    if (remember) {
+      authPromptDismissed = true;
+      sessionStorage.setItem("inkleaf.authPromptDismissed", "1");
+    }
+  }
+
+  async function signInWithGoogle() {
     if (!firebaseReady || !firebaseAuth) {
-      signInBtn.title = "Firebase is still loading or is not configured.";
+      alert("Sign-in is still loading. Please try again in a moment.");
       return;
     }
     try {
       signInBtn.disabled = true;
+      if (authModalSignInBtn) authModalSignInBtn.disabled = true;
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      await firebaseAuth.signInWithPopup(provider);
+      // Redirect is more reliable on phones and iPad Safari; popup is convenient on desktop.
+      if (isMobile()) await firebaseAuth.signInWithRedirect(provider);
+      else await firebaseAuth.signInWithPopup(provider);
     } catch (e) {
       console.error("Google sign-in failed", e);
       if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
-        alert("Google sign-in failed. Check Firebase Authentication and Authorized domains.");
+        alert("We couldn't complete Google sign-in. Please check your Firebase Authentication settings and try again.");
       }
     } finally {
       signInBtn.disabled = false;
+      if (authModalSignInBtn) authModalSignInBtn.disabled = false;
     }
+  }
+
+  signInBtn.addEventListener("click", signInWithGoogle);
+  authModalSignInBtn?.addEventListener("click", signInWithGoogle);
+  authContinueBtn?.addEventListener("click", () => hideAuthPrompt(true));
+  authCloseBtn?.addEventListener("click", () => hideAuthPrompt(true));
+
+  authModal?.querySelector(".auth-modal-backdrop")?.addEventListener("click", () => hideAuthPrompt(true));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && authModal && !authModal.hidden) hideAuthPrompt(true);
   });
 
   signOutBtn.addEventListener("click", async () => {
