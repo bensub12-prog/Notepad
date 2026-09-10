@@ -223,6 +223,19 @@
       try { await firestore.enablePersistence({ synchronizeTabs: true }); }
       catch (e) { console.warn("Firestore persistence could not be enabled:", e.code || e); }
 
+      try {
+        await firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      } catch (e) {
+        console.warn("Auth persistence could not be enabled:", e.code || e);
+      }
+
+      // Complete a redirect sign-in if Google returned to this GitHub Pages app.
+      try {
+        await firebaseAuth.getRedirectResult();
+      } catch (e) {
+        if (e && e.code) showAuthError(e);
+      }
+
       firebaseAuth.onAuthStateChanged(async (user) => {
         if (unsubscribeNotes) { unsubscribeNotes(); unsubscribeNotes = null; }
         cloudSyncStarted = false;
@@ -675,25 +688,44 @@
     }
   }
 
+  function showAuthError(error) {
+    const code = error?.code || "unknown-error";
+    const message = error?.message || "An unknown authentication error occurred.";
+    console.error("Google sign-in failed:", { code, message, error });
+
+    // Keep the error inside the app instead of using a browser alert.
+    if (authModal) {
+      const title = document.getElementById("authModalTitle");
+      const text = document.getElementById("authModalText");
+      if (title) title.textContent = "We couldn't sign you in.";
+      if (text) text.innerHTML = `Please try again. <strong>Error:</strong> ${code}.<br><small>${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</small>`;
+      authModal.hidden = false;
+      document.body.classList.add("auth-open");
+      setTimeout(() => authModalSignInBtn?.focus(), 60);
+    } else {
+      alert(`Google sign-in failed: ${code}\n${message}`);
+    }
+  }
+
   async function signInWithGoogle() {
     if (!firebaseReady || !firebaseAuth) {
-      alert("Sign-in is still loading. Please try again in a moment.");
+      showAuthError({ code: "firebase-not-ready", message: "Firebase is still loading. Please try again in a moment." });
       return;
     }
+
     try {
       signInBtn.disabled = true;
       if (authModalSignInBtn) authModalSignInBtn.disabled = true;
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      // Redirect is more reliable on phones and iPad Safari; popup is convenient on desktop.
-      if (isMobile()) await firebaseAuth.signInWithRedirect(provider);
-      else await firebaseAuth.signInWithPopup(provider);
+
+      // Redirect is used for every device. It avoids popup blockers and is reliable
+      // on desktop, iPhone, iPad, and Android when hosted on GitHub Pages.
+      await firebaseAuth.signInWithRedirect(provider);
     } catch (e) {
-      console.error("Google sign-in failed", e);
       if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
-        alert("We couldn't complete Google sign-in. Please check your Firebase Authentication settings and try again.");
+        showAuthError(e);
       }
-    } finally {
       signInBtn.disabled = false;
       if (authModalSignInBtn) authModalSignInBtn.disabled = false;
     }
