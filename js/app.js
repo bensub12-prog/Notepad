@@ -46,6 +46,12 @@
   const authContinueBtn = document.getElementById("authContinueBtn");
   const authCloseBtn = document.getElementById("authCloseBtn");
   let authPromptDismissed = sessionStorage.getItem("inkleaf.authPromptDismissed") === "1";
+  let authStateResolved = false;
+
+  // Wait for Firebase to restore the previous login before showing signed-out UI.
+  // This prevents the sign-in prompt from flashing on reload when the user is already signed in.
+  signedOutBox.classList.add("hidden");
+  signedInBox.classList.add("hidden");
 
   // ---------- Firebase + local storage ----------
   const GUEST_KEY = "guest";
@@ -237,6 +243,7 @@
       }
 
       firebaseAuth.onAuthStateChanged(async (user) => {
+        authStateResolved = true;
         if (unsubscribeNotes) { unsubscribeNotes(); unsubscribeNotes = null; }
         cloudSyncStarted = false;
         firebaseUser = user;
@@ -277,12 +284,15 @@
           renderAll();
           if (!notes.length) createNote();
           // Give first-time visitors a clear, professional choice to enable sync.
+          // Only offer sign-in after Firebase has definitively confirmed that no account is signed in.
           if (!authPromptDismissed) setTimeout(showAuthPrompt, 350);
         }
       });
     } catch (e) {
       console.error("Firebase initialization failed", e);
       firebaseReady = false;
+      authStateResolved = true;
+      applySignedOutUI();
       signInBtn.title = "Firebase could not be initialized. Check the Firebase configuration.";
     }
   }
@@ -672,7 +682,7 @@
   }
 
   function showAuthPrompt() {
-    if (!authModal || authPromptDismissed || firebaseUser) return;
+    if (!authModal || authPromptDismissed || firebaseUser || !authStateResolved) return;
     authModal.hidden = false;
     document.body.classList.add("auth-open");
     setTimeout(() => authModalSignInBtn?.focus(), 60);
