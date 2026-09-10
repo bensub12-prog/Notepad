@@ -1,4 +1,4 @@
-const CACHE_NAME = "inkleaf-notes-v1";
+const CACHE_NAME = "inkleaf-notes-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
