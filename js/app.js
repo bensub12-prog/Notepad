@@ -108,8 +108,19 @@
       "auth/web-storage-unsupported": "Your browser is blocking the storage sign-in needs — this happens in some private/incognito modes or with strict cookie-blocking settings.",
       "auth/cancelled-popup-request": null,
       "auth/popup-closed-by-user": null,
+      "standalone-unsupported": `Google sign-in can't complete inside an app installed to your Home Screen on iOS — that's an Apple platform limitation, not a bug here. Open <strong>${location.origin}${location.pathname}</strong> in Safari (not the Home Screen icon), sign in there once, then reopen the installed app — it will already be signed in.`,
+      "redirect-lost-standalone": `Sign-in didn't complete. Apps installed to the iOS Home Screen often can't finish Google's sign-in redirect. Open <strong>${location.origin}${location.pathname}</strong> in Safari (not the Home Screen icon) and sign in there once — the installed app will pick up that session automatically.`,
+      "redirect-lost": "Sign-in didn't complete — on iPhone/iPad this is usually Safari's cross-site tracking protection blocking the sign-in redirect. Try again; if it keeps happening, open Settings → Safari and check that \"Prevent Cross-Site Tracking\" isn't blocking this, or try again with private browsing off.",
     };
     return map[code] ?? null;
+  }
+
+  function isIOS() {
+    return /iP(hone|od|ad)/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); // iPadOS 13+ reports as Mac
+  }
+  function isStandalonePWA() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
   }
 
   function friendlySyncError(code) {
@@ -310,11 +321,27 @@
       }
 
       // Complete a redirect sign-in if Google returned to this GitHub Pages app.
+      let redirectResult = null;
       try {
-        await firebaseAuth.getRedirectResult();
+        redirectResult = await firebaseAuth.getRedirectResult();
       } catch (e) {
         console.error("getRedirectResult failed:", e?.code || e);
         if (e && e.code) showAuthError(e);
+      }
+
+      // Detect a redirect round-trip that came back with no session — this is
+      // the classic iOS Safari/WKWebView symptom of "sign-in has no effect."
+      // No exception is thrown; Firebase just silently returns no user because
+      // the cross-domain storage handshake with the authDomain was blocked.
+      const pendingRedirect = sessionStorage.getItem("inkleaf.pendingGoogleRedirect");
+      if (pendingRedirect) {
+        sessionStorage.removeItem("inkleaf.pendingGoogleRedirect");
+        const wasStandalone = sessionStorage.getItem("inkleaf.pendingGoogleRedirectStandalone") === "1";
+        sessionStorage.removeItem("inkleaf.pendingGoogleRedirectStandalone");
+        if (!redirectResult?.user && !firebaseAuth.currentUser) {
+          console.warn("Redirect round-trip completed with no session (wasStandalone:", wasStandalone, ")");
+          showAuthError({ code: wasStandalone ? "redirect-lost-standalone" : "redirect-lost" });
+        }
       }
 
       firebaseAuth.onAuthStateChanged(async (user) => {
@@ -845,7 +872,7 @@
       if (AUTH_MODAL_TEXT_EL) {
         const escaped = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
         AUTH_MODAL_TEXT_EL.innerHTML = hint
-          ? `${hint}<br><small>Error code: <code>${code}</code></small>`
+          ? (code.includes("/") ? `${hint}<br><small>Error code: <code>${code}</code></small>` : hint)
           : `Please try again. <strong>Error:</strong> ${code}.<br><small>${escaped}</small>`;
       }
       authModal.hidden = false;
@@ -862,14 +889,49 @@
       return;
     }
 
+    // Apps installed to the iOS Home Screen run in an isolated WKWebView that
+    // reliably fails to complete Google's redirect-based sign-in handshake.
+    // Attempting it just strands the user, so point them at Safari instead.
+    if (isStandalonePWA() && isIOS()) {
+      showAuthError({ code: "standalone-unsupported" });
+      return;
+    }
+
     try {
       signInBtn.disabled = true;
       if (authModalSignInBtn) authModalSignInBtn.disabled = true;
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
 
-      // Redirect is used for every device. It avoids popup blockers and is reliable
-      // on desktop, iPhone, iPad, and Android when hosted on GitHub Pages.
+      if (isIOS()) {
+        // A popup keeps both windows alive at once and hands the session back
+        // via postMessage, which sidesteps the cross-domain storage handshake
+        // that iOS Safari's tracking protections frequently block during a
+        // full-page redirect. Fall back to redirect if the popup itself is
+        // unavailable (e.g. blocked).
+        try {
+          await firebaseAuth.signInWithPopup(provider);
+          signInBtn.disabled = false;
+          if (authModalSignInBtn) authModalSignInBtn.disabled = false;
+          return;
+        } catch (popupErr) {
+          const fallbackCodes = ["auth/popup-blocked", "auth/operation-not-supported-in-this-environment"];
+          if (!fallbackCodes.includes(popupErr.code)) {
+            if (popupErr.code !== "auth/popup-closed-by-user" && popupErr.code !== "auth/cancelled-popup-request") {
+              showAuthError(popupErr);
+            }
+            signInBtn.disabled = false;
+            if (authModalSignInBtn) authModalSignInBtn.disabled = false;
+            return;
+          }
+          // Popup unavailable — fall through to redirect below.
+        }
+      }
+
+      // Redirect for everything else. It avoids popup blockers and is reliable
+      // on desktop and Android when hosted on GitHub Pages.
+      sessionStorage.setItem("inkleaf.pendingGoogleRedirect", "1");
+      if (isStandalonePWA()) sessionStorage.setItem("inkleaf.pendingGoogleRedirectStandalone", "1");
       await firebaseAuth.signInWithRedirect(provider);
     } catch (e) {
       if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
