@@ -33,29 +33,7 @@ If you see a different code, the banner text and browser console
 (`Cloud sync error: ...`) will have the exact code and message — that's the
 fastest way to pin it down further.
 
-## iPhone/iPad: sign-in "does nothing" and reverts
 
-This is a known iOS platform issue, not something misconfigured in Firebase.
-This version now handles it as follows:
-
-- **If you open the site in Safari directly** (not installed to your Home
-  Screen): sign-in now tries a **popup** first on iOS instead of a full-page
-  redirect. Redirect-based sign-in relies on Firebase reading data back from
-  a different domain (`*.firebaseapp.com`) after the round trip, and iOS
-  Safari's cross-site tracking protections frequently block that handshake
-  silently — no error, it just "does nothing," which matches what you saw.
-  A popup avoids that handshake entirely. If the popup is blocked, it falls
-  back to redirect, and if *that* comes back with no session, you'll now see
-  a clear on-screen message instead of silence.
-- **If you installed the app to your Home Screen** (Add to Home Screen): Google
-  sign-in **cannot complete inside that installed app on iOS** — this is an
-  Apple WKWebView limitation, not something any code fix can work around.
-  The app now detects this and tells you directly: open the site's URL in
-  Safari itself (not the Home Screen icon), sign in there once, then reopen
-  the installed app — since it's the same origin, it will already be signed
-  in via the persisted session.
-
-## 1. Firebase setup
 
 This project is already configured for the Firebase project used by Inkleaf
 Notes. The web client configuration is in `index.html`. Client-side Firebase
